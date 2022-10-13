@@ -14,6 +14,8 @@
 package com.alibaba.nacos.config.server.service.datasource;
 
 import com.alibaba.nacos.common.utils.Preconditions;
+import com.alibaba.nacos.config.server.utils.PropertyUtil;
+import com.alibaba.nacos.multidatasource.provider.DataSourceDialectProvider;
 import com.zaxxer.hikari.HikariDataSource;
 import org.apache.commons.collections.CollectionUtils;
 import org.springframework.boot.context.properties.bind.Bindable;
@@ -23,6 +25,7 @@ import org.springframework.core.env.Environment;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.TimeUnit;
 
 import static com.alibaba.nacos.common.utils.CollectionUtils.getOrDefault;
 
@@ -38,12 +41,16 @@ public class ExternalDataSourceProperties {
     private static final String TEST_QUERY = "SELECT 1";
     
     private Integer num;
+
+    private String dataSourceType;
     
     private List<String> url = new ArrayList<>();
     
     private List<String> user = new ArrayList<>();
     
     private List<String> password = new ArrayList<>();
+
+    private List<String> driver = new ArrayList<>();
     
     public void setNum(Integer num) {
         this.num = num;
@@ -60,6 +67,18 @@ public class ExternalDataSourceProperties {
     public void setPassword(List<String> password) {
         this.password = password;
     }
+
+    public String getDataSourceType() {
+        return this.dataSourceType;
+    }
+
+    public void setDataSourceType(String dataSourceType) {
+        this.dataSourceType = dataSourceType;
+    }
+
+    public void setDriver(List<String> driver) {
+        this.driver = driver;
+    }
     
     /**
      * Build serveral HikariDataSource.
@@ -71,19 +90,25 @@ public class ExternalDataSourceProperties {
     List<HikariDataSource> build(Environment environment, Callback<HikariDataSource> callback) {
         List<HikariDataSource> dataSources = new ArrayList<>();
         Binder.get(environment).bind("db", Bindable.ofInstance(this));
+        // 设置指定的数据源类型
+        this.dataSourceType = PropertyUtil.getPlatform();
         Preconditions.checkArgument(Objects.nonNull(num), "db.num is null");
         Preconditions.checkArgument(CollectionUtils.isNotEmpty(user), "db.user or db.user.[index] is null");
         Preconditions.checkArgument(CollectionUtils.isNotEmpty(password), "db.password or db.password.[index] is null");
+        Preconditions.checkArgument(CollectionUtils.isNotEmpty(driver), "db.driver or db.driver.[index] is null");
         for (int index = 0; index < num; index++) {
             int currentSize = index + 1;
             Preconditions.checkArgument(url.size() >= currentSize, "db.url.%s is null", index);
             DataSourcePoolProperties poolProperties = DataSourcePoolProperties.build(environment);
-            poolProperties.setDriverClassName(JDBC_DRIVER_NAME);
+            // 设置数据源Driver
+            poolProperties.setDriverClassName(driver.get(index).trim());
             poolProperties.setJdbcUrl(url.get(index).trim());
             poolProperties.setUsername(getOrDefault(user, index, user.get(0)).trim());
             poolProperties.setPassword(getOrDefault(password, index, password.get(0)).trim());
+            // 根据封装好的poolProperties设置HikariDataSource
             HikariDataSource ds = poolProperties.getDataSource();
-            ds.setConnectionTestQuery(TEST_QUERY);
+            ds.setConnectionTestQuery(DataSourceDialectProvider.getDialect(dataSourceType).getTestQuery());
+            ds.setIdleTimeout(TimeUnit.MINUTES.toMillis(10L));
             dataSources.add(ds);
             callback.accept(ds);
         }

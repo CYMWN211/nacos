@@ -22,6 +22,8 @@ import com.alibaba.nacos.common.utils.IoUtils;
 import com.alibaba.nacos.config.server.constant.Constants;
 import com.alibaba.nacos.config.server.utils.LogUtil;
 import com.alibaba.nacos.config.server.utils.PropertyUtil;
+import com.alibaba.nacos.multidatasource.dialect.DatabaseDialect;
+import com.alibaba.nacos.multidatasource.dialect.DerbyDatabaseDialect;
 import com.alibaba.nacos.sys.env.EnvUtil;
 import com.alibaba.nacos.sys.utils.DiskUtils;
 import com.zaxxer.hikari.HikariDataSource;
@@ -259,6 +261,17 @@ public class LocalDataSourceServiceImpl implements DataSourceService {
                 }
             }
         }
+    }
+
+    @Override
+    public String getDataSourceType() {
+        // 默认使用内置的derby数据库
+        return "derby";
+    }
+
+    @Override
+    public DatabaseDialect databaseDialect() {
+        return new DerbyDatabaseDialect();
     }
     
 }

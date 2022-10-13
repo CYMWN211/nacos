@@ -22,6 +22,8 @@ import com.alibaba.nacos.common.utils.StringUtils;
 import com.alibaba.nacos.config.server.monitor.MetricsMonitor;
 import com.alibaba.nacos.config.server.utils.ConfigExecutor;
 import com.alibaba.nacos.config.server.utils.PropertyUtil;
+import com.alibaba.nacos.multidatasource.dialect.DatabaseDialect;
+import com.alibaba.nacos.multidatasource.provider.DataSourceDialectProvider;
 import com.alibaba.nacos.sys.env.EnvUtil;
 import com.zaxxer.hikari.HikariDataSource;
 import org.springframework.dao.DataAccessException;
@@ -75,6 +77,10 @@ public class ExternalDataSourceServiceImpl implements DataSourceService {
     private volatile List<Boolean> isHealthList;
     
     private volatile int masterIndex;
+
+    private String dataSourceType;
+
+    private DatabaseDialect databaseDialect;
     
     @Override
     public void init() {
@@ -119,37 +125,21 @@ public class ExternalDataSourceServiceImpl implements DataSourceService {
     @Override
     public synchronized void reload() throws IOException {
         try {
-            final List<JdbcTemplate> testJtListNew = new ArrayList<JdbcTemplate>();
-            final List<Boolean> isHealthListNew = new ArrayList<Boolean>();
-    
-            List<HikariDataSource> dataSourceListNew = new ExternalDataSourceProperties()
+            final ExternalDataSourceProperties externalDataSourceProperties = new ExternalDataSourceProperties();
+            dataSourceList = externalDataSourceProperties
                     .build(EnvUtil.getEnvironment(), (dataSource) -> {
                         JdbcTemplate jdbcTemplate = new JdbcTemplate();
                         jdbcTemplate.setQueryTimeout(queryTimeout);
                         jdbcTemplate.setDataSource(dataSource);
-                        testJtListNew.add(jdbcTemplate);
-                        isHealthListNew.add(Boolean.TRUE);
+                        testJtList.add(jdbcTemplate);
+                        isHealthList.add(Boolean.TRUE);
                     });
-    
-            final List<HikariDataSource> dataSourceListOld = dataSourceList;
-            final List<JdbcTemplate> testJtListOld = testJtList;
-            dataSourceList = dataSourceListNew;
-            testJtList = testJtListNew;
-            isHealthList = isHealthListNew;
+            // loadDataBaseType
+            this.dataSourceType = externalDataSourceProperties.getDataSourceType();
+            // load databaseDialect by type
+            this.databaseDialect = DataSourceDialectProvider.getDialect(this.dataSourceType);
             new SelectMasterTask().run();
             new CheckDbHealthTask().run();
-            
-            //close old datasource.
-            if (dataSourceListOld != null && !dataSourceListOld.isEmpty()) {
-                for (HikariDataSource dataSource : dataSourceListOld) {
-                    dataSource.close();
-                }
-            }
-            if (testJtListOld != null && !testJtListOld.isEmpty()) {
-                for (JdbcTemplate oldJdbc : testJtListOld) {
-                    oldJdbc.setDataSource(null);
-                }
-            }
         } catch (RuntimeException e) {
             FATAL_LOG.error(DB_LOAD_ERROR_MSG, e);
             throw new IOException(e);
@@ -280,5 +270,15 @@ public class ExternalDataSourceServiceImpl implements DataSourceService {
                 }
             }
         }
+    }
+
+    @Override
+    public String getDataSourceType() {
+        return this.dataSourceType;
+    }
+
+    @Override
+    public DatabaseDialect databaseDialect() {
+        return this.databaseDialect;
     }
 }

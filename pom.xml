@@ -596,6 +596,7 @@
         <module>sys</module>
         <module>plugin</module>
         <module>plugin-default-impl</module>
+        <module>multidatasource</module>
     </modules>
     
     <!-- Default dependencies in all subprojects -->
@@ -722,6 +723,11 @@
             <dependency>
                 <groupId>${project.groupId}</groupId>
                 <artifactId>nacos-sys</artifactId>
+                <version>${project.version}</version>
+            </dependency>
+            <dependency>
+                <groupId>${project.groupId}</groupId>
+                <artifactId>nacos-multidatasource</artifactId>
                 <version>${project.version}</version>
             </dependency>
             
