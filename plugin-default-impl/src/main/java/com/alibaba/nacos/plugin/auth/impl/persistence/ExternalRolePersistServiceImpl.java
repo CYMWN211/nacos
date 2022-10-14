@@ -89,9 +89,9 @@ public class ExternalRolePersistServiceImpl implements RolePersistService {
     public Page<RoleInfo> getRolesByUserNameAndRoleName(String username, String role, int pageNo, int pageSize) {
         
         PaginationHelper<RoleInfo> helper = persistService.createPaginationHelper();
-        
+
         String sqlCountRows = "SELECT count(*) FROM roles ";
-        
+
         String sqlFetchRows = "SELECT role,username FROM roles ";
 
         StringBuilder where = new StringBuilder(" WHERE 1 = 1 ");
@@ -160,15 +160,17 @@ public class ExternalRolePersistServiceImpl implements RolePersistService {
         String sql = "DELETE FROM roles WHERE role=? AND username=?";
         try {
             jt.update(sql, role, username);
-        } catch (CannotGetJdbcConnectionException e) {
-            LogUtil.FATAL_LOG.error("[db-error] " + e.toString(), e);
-            throw e;
+        } catch (CannotGetJdbcConnectionException exception) {
+            LogUtil.FATAL_LOG.error("[db-error] " + exception, exception);
+            throw exception;
         }
     }
     
     @Override
     public List<String> findRolesLikeRoleName(String role) {
-        String sql = "SELECT role FROM roles WHERE role LIKE '%' ? '%'";
+//        String sql = "SELECT role FROM roles WHERE role LIKE '%' ? '%'";
+        // 适配Postgresql语法
+        String sql = "SELECT role FROM roles WHERE role LIKE ?";
         List<String> users = this.jt.queryForList(sql, new String[] {role}, String.class);
         return users;
     }
